@@ -3,6 +3,7 @@ import tensorflow as tf
 import os
 import cv2
 from PIL import Image
+from scipy.misc import imresize
 
 def _tf_fspecial_gauss(size, sigma):
     """Function to mimic the 'fspecial' gaussian MATLAB function
@@ -89,18 +90,20 @@ def sobel_conv(images, dim=5):
     filtered = tf.sqrt(tf.pow(filtered_x, 2) + tf.pow(filtered_y, 2))
     return filtered
 
-def extract_dicom(files):
+def extract_dicom(files, invert):
     images = []
     # loop through all the DICOM files
     for i, filenameDCM in enumerate(files):
-        print("step: " + filenameDCM + " ", i)
+        print("Extract: " + filenameDCM + " ", i)
         # read the jpg file
         ds = cv2.imread(filenameDCM)
         ds = cv2.cvtColor(ds, cv2.COLOR_BGR2GRAY)
+        if invert:
+            ds = cv2.bitwise_not(ds)
         images += [ds]
     return images
 
-def extract_data(paths, num = -1, extension="jpg"):
+def extract_data(paths, num = -1, invert=False, extension="jpg"):
     lstFilesDCM = []  # create an empty list
 
     for path in paths:
@@ -113,7 +116,7 @@ def extract_data(paths, num = -1, extension="jpg"):
     if num == -1:
         num = len(lstFilesDCM)
 
-    images = extract_dicom(sorted(lstFilesDCM)[:num])
+    images = extract_dicom(sorted(lstFilesDCM)[:num], invert=invert)
     return images
 
 def crop_to_square(image, upsampling):
@@ -148,3 +151,7 @@ def resize(images, size):
 
 def crop(images, upsampling=False):
     return [crop_to_square(im, upsampling=upsampling) for im in images]
+
+def checkAndCreateDir(dir_path):
+    if not os.path.isdir(dir_path):
+        os.makedirs(dir_path)
