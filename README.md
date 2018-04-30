@@ -43,7 +43,7 @@ The project requires `Python>=3.5` and `Tensorflow>=1.4.1` (both cpu or gpu work
 4. Run `python test.py` to evaluate your model on the test set.
 
 ## Acknowledgement
-I would like to thank [LoudeNOUGH](https://github.com/LoudeNOUGH/bone-suppression) and Xinyu Weng (北京大學) for sharing their experiences on this task. Also I would like to thank Felix Yu for providing DenseNet-Keras source code.
+I would like to thank [LoudeNOUGH](https://github.com/LoudeNOUGH/bone-suppression) for scratch training script and Hussam Habbreeh (حسام هب الريح) for sharing his experiences on this task.
 
 ## Author
 Chuong M. Huynh (minhchuong.itus@gmail.com)
