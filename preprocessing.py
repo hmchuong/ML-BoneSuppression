@@ -1,4 +1,4 @@
-from utils import extract_data, checkAndCreateDir, resize, crop, preprocess
+from utils import extract_data, check_and_create_dir, resize, crop, preprocess
 import os
 from keras.preprocessing.image import ImageDataGenerator
 from scipy.misc import imsave, imresize
@@ -21,11 +21,11 @@ class ImageProcessing:
         x_images = resize(x_images, self.image_size)
 
         # Check output directory
-        checkAndCreateDir(output_dir)
+        check_and_create_dir(output_dir)
         x_dir = os.path.join(output_dir, "x")
         y_dir = os.path.join(output_dir, "y")
-        checkAndCreateDir(x_dir)
-        checkAndCreateDir(y_dir)
+        check_and_create_dir(x_dir)
+        check_and_create_dir(y_dir)
 
         for i in range(len(x_images)):
             # the template
@@ -54,8 +54,8 @@ class ImageProcessing:
         # Output
         x_path = os.path.join(output_dir, "x")
         y_path = os.path.join(output_dir, "y")
-        checkAndCreateDir(x_path)
-        checkAndCreateDir(y_path)
+        check_and_create_dir(x_path)
+        check_and_create_dir(y_path)
 
         train = crop(x_images, upsampling='True')
         train = resize(train, self.image_size)

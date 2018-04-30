@@ -152,6 +152,45 @@ def resize(images, size):
 def crop(images, upsampling=False):
     return [crop_to_square(im, upsampling=upsampling) for im in images]
 
-def checkAndCreateDir(dir_path):
+def check_and_create_dir(dir_path):
     if not os.path.isdir(dir_path):
         os.makedirs(dir_path)
+
+def read_jpg(filename_queue):
+    reader = tf.WholeFileReader()
+    key, record_string = reader.read(filename_queue)
+    path, image = reader.read(filename_queue)
+    image = tf.image.decode_jpeg(image, channels=1)
+    image = image / 255
+    return image
+
+def input_pipeline(x_filenames, y_filenames, batch_size, image_size, queue_capacity, capacity, min_after_dequeue, num_threads):
+    seed = np.random.random()
+    x_filename_queue = tf.train.string_input_producer(x_filenames, seed=seed, capacity=queue_capacity)
+    y_filename_queue = tf.train.string_input_producer(y_filenames, seed=seed, capacity=queue_capacity)
+    x_image = read_jpg(x_filename_queue)
+    y_image = read_jpg(y_filename_queue)
+
+    batch = tf.train.shuffle_batch(
+        [x_image, y_image],
+        batch_size=batch_size,
+        capacity=capacity,
+        min_after_dequeue=min_after_dequeue,
+        num_threads=num_threads,
+        shapes=((image_size, image_size, 1), (image_size, image_size, 1)))
+    return batch
+
+def read_test_images(dir_path, image_size):
+    images = []
+    for dirName, subdirList, fileList in os.walk(dir_path):
+        for filename in fileList:
+            image_path = os.path.join(dirName,filename)
+            try:
+                ds = cv2.imread(image_path)
+                ds = cv2.cvtColor(ds, cv2.COLOR_BGR2GRAY)
+                ds = cv2.resize(ds,(image_size,image_size))
+                ds = np.reshape(ds, (image_size, image_size, 1))
+                images.append(ds)
+            except:
+                print("Cannot extract image {}".format(image_path))
+    return images
