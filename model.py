@@ -74,6 +74,7 @@ class AELikeModel:
         loss = []
         loss_2 = []
         for j in range(1, self.test_X_images.shape[0], 1):
+            print("Processing ", j)
             [a, b] = sess.run([self.cost, self.cost_2], feed_dict={self.X: self.test_X_images[(j-1):j], self.Y_clear: self.test_Y_images[(j-1):j]})
             loss += [a]
             loss_2 += [b]
@@ -96,6 +97,15 @@ class AELikeModel:
         if not self.trained_model is None:
             saver.restore(sess, self.trained_model)
         return (sess,saver)
+
+    def get_loss(self, test_X_path_dir, test_Y_path_dir):
+        self.test_X_images = np.array(read_test_images(test_X_path_dir, self.image_size))
+        self.test_Y_images = np.array(read_test_images(test_Y_path_dir, self.image_size))
+        sess, saver = self.init_session()
+        mse, ssim, mixed = self.calculate_loss_on_test(sess)
+        print("Loss MSE: ", mse)
+        print("Loss SSIM: ", ssim)
+        print("Mixed loss: ", mixed)
 
     def train(self, x_path_pattern, y_path_pattern, queue_capacity, capacity, min_after_dequeue, num_threads, test_X_path_dir, test_Y_path_dir, epochs, train_steps, learning_rate, epochs_to_reduce_lr, reduce_lr, output_dir, b_size):
         """
@@ -184,7 +194,10 @@ class AELikeModel:
         check_and_create_dir(output_dir)
         sess, saver = self.init_session()
         for dirName, subdirList, fileList in os.walk(input_dir):
+            total = len(fileList)
+            i = 0
             for filename in fileList:
+                i += 1
                 image_path = os.path.join(dirName,filename)
                 ds = None
                 try:
@@ -196,8 +209,13 @@ class AELikeModel:
                     ds = np.reshape(ds, (1, self.image_size, self.image_size, 1))
                 except:
                     print("Cannot test image {}".format(image_path))
+                    with open(os.path.join(output_dir,"unsuccess.txt"), "a") as f:
+                        f.write(image_path + '\n')
                     continue
                 encoded_image = sess.run(self.Y, feed_dict={self.X: ds})
+
                 encoded_image = encoded_image.reshape((self.image_size, self.image_size))
-                imsave(os.path.join(output_dir, 'encoded_'+ filename), encoded_image)
-                print("Done encode image {}".format(filename))
+                imsave(os.path.join(output_dir, filename), encoded_image)
+                print("Done encode image {} ({}/{} - {}%)".format(filename, i, total, float(i)/total*100))
+                with open(os.path.join(output_dir,"success.txt"), "a") as f:
+                    f.write(image_path + '\n')
