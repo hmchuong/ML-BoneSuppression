@@ -1,14 +1,10 @@
 from tensorflow.python.framework.ops import reset_default_graph
 import tensorflow as tf
-from bse_clahe.utils import read_test_images, check_and_create_dir, tf_ms_ssim, input_pipeline
+from utils import read_test_images, check_and_create_dir, tf_ms_ssim, input_pipeline
 import os
 import numpy as np
 import cv2
 from scipy.misc import imsave
-from PIL import ImageFile
-from PIL import Image
-
-ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 class AELikeModel:
     """AE-like Model with Pooling as a Size-changing Factor"""
@@ -16,8 +12,60 @@ class AELikeModel:
         reset_default_graph()
         self.image_size = image_size
         self.alpha = alpha
+        self.X = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 1])
+        self.Y_clear = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 1])
+        X_tensor = tf.reshape(self.X, [-1, self.image_size, self.image_size, 1])
+
+        n_filters = [16, 32, 64]
+        filter_sizes = [5, 5, 5]
+
+        current_input = X_tensor
+        n_input = 1
+
+        Ws = []
+        shapes = []
+
+        for layer_i, n_output in enumerate(n_filters):
+            with tf.variable_scope("encoder/layer/{}".format(layer_i)):
+                shapes.append(current_input.get_shape().as_list())
+                W = tf.get_variable(
+                    name='W',
+                    shape=[
+                        filter_sizes[layer_i],
+                        filter_sizes[layer_i],
+                        n_input,
+                        n_output],
+                    initializer=tf.random_normal_initializer(mean=0.0, stddev=0.02))
+                h = tf.nn.conv2d(current_input, W,
+                    strides=[1, 1, 1, 1], padding='SAME')
+                conv = tf.nn.relu(h)
+                current_input = tf.nn.max_pool(conv, [1,2,2,1], [1,2,2,1], padding='SAME')
+                Ws.append(W)
+                n_input = n_output
+        Ws.reverse()
+        shapes.reverse()
+        n_filters.reverse()
+        n_filters = n_filters[1:] + [1]
+
+        for layer_i, shape in enumerate(shapes):
+            with tf.variable_scope("decoder/layer/{}".format(layer_i)):
+                W = Ws[layer_i]
+                h = tf.nn.conv2d_transpose(current_input, W,
+                    tf.stack([tf.shape(self.X)[0], shape[1], shape[2], shape[3]]),
+                    strides=[1, 2, 2, 1], padding='SAME')
+                current_input = tf.nn.relu(h)
+
+        self.Y = current_input
+
+        # MSE
+        self.cost_2 = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.Y_clear, self.Y), 1))
+        self.cost = 1 - tf_ms_ssim(self.Y_clear, self.Y)
+
+        # Using Adam for optimizer
+        self.learning_rate = tf.Variable(initial_value=1e-2, trainable=False, dtype=tf.float32)
+        self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.alpha*self.cost + (1 - self.alpha)*self.cost_2)
+        self.batch_size = tf.Variable(initial_value=64, trainable=False, dtype=tf.int32)
         self.trained_model = trained_model
-        self.init_session()
 
     def calculate_loss_on_test(self, sess):
         """
@@ -39,72 +87,16 @@ class AELikeModel:
         """
         Init session
         """
-        sess = None
-        with tf.Graph().as_default() as graph:
-            self.X = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 1])
-            self.Y_clear = tf.placeholder(tf.float32, [None, self.image_size, self.image_size, 1])
-            X_tensor = tf.reshape(self.X, [-1, self.image_size, self.image_size, 1])
+        sess = tf.Session()
+        sess.run(tf.global_variables_initializer())
+        sess.run(tf.local_variables_initializer())
+        saver = tf.train.Saver()
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-            n_filters = [16, 32, 64]
-            filter_sizes = [5, 5, 5]
-
-            current_input = X_tensor
-            n_input = 1
-
-            Ws = []
-            shapes = []
-
-            for layer_i, n_output in enumerate(n_filters):
-                with tf.variable_scope("encoder/layer/{}".format(layer_i)):
-                    shapes.append(current_input.get_shape().as_list())
-                    W = tf.get_variable(
-                        name='W',
-                        shape=[
-                            filter_sizes[layer_i],
-                            filter_sizes[layer_i],
-                            n_input,
-                            n_output],
-                        initializer=tf.random_normal_initializer(mean=0.0, stddev=0.02))
-                    h = tf.nn.conv2d(current_input, W,
-                        strides=[1, 1, 1, 1], padding='SAME')
-                    conv = tf.nn.relu(h)
-                    current_input = tf.nn.max_pool(conv, [1,2,2,1], [1,2,2,1], padding='SAME')
-                    Ws.append(W)
-                    n_input = n_output
-            Ws.reverse()
-            shapes.reverse()
-            n_filters.reverse()
-            n_filters = n_filters[1:] + [1]
-
-            for layer_i, shape in enumerate(shapes):
-                with tf.variable_scope("decoder/layer/{}".format(layer_i)):
-                    W = Ws[layer_i]
-                    h = tf.nn.conv2d_transpose(current_input, W,
-                        tf.stack([tf.shape(self.X)[0], shape[1], shape[2], shape[3]]),
-                        strides=[1, 2, 2, 1], padding='SAME')
-                    current_input = tf.nn.relu(h)
-
-            self.Y = current_input
-
-            # MSE
-            self.cost_2 = tf.reduce_mean(tf.reduce_mean(tf.squared_difference(self.Y_clear, self.Y), 1))
-            self.cost = 1 - tf_ms_ssim(self.Y_clear, self.Y)
-
-            # Using Adam for optimizer
-            self.learning_rate = tf.Variable(initial_value=1e-2, trainable=False, dtype=tf.float32)
-            self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate).minimize(self.alpha*self.cost + (1 - self.alpha)*self.cost_2)
-            self.batch_size = tf.Variable(initial_value=64, trainable=False, dtype=tf.int32)
-            sess = tf.Session(graph=graph)
-            sess.run(tf.global_variables_initializer())
-            sess.run(tf.local_variables_initializer())
-            saver = tf.train.Saver()
-            coord = tf.train.Coordinator()
-            threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-            print("Restore from model")
-            if not self.trained_model is None:
-                saver.restore(sess, self.trained_model)
-        self.sess = sess
-        #return (sess,saver)
+        if not self.trained_model is None:
+            saver.restore(sess, self.trained_model)
+        return (sess,saver)
 
     def get_loss(self, test_X_path_dir, test_Y_path_dir):
         self.test_X_images = np.array(read_test_images(test_X_path_dir, self.image_size))
