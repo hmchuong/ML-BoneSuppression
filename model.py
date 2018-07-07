@@ -1,6 +1,6 @@
 from tensorflow.python.framework.ops import reset_default_graph
 import tensorflow as tf
-from bse_clahe.utils import read_test_images, check_and_create_dir, tf_ms_ssim, input_pipeline
+from utils import read_test_images, check_and_create_dir, tf_ms_ssim, input_pipeline
 import os
 import numpy as np
 import cv2
