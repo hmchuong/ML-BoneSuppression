@@ -36,7 +36,7 @@ If you want to start testing without training from scratch, you can use the [mod
 **Note that currently this project can only be executed in Linux and macOS. You might run into some issues in Windows.**
 1. Create & activate a new python3 virtualenv. (optional)
 2. Install dependencies by running `pip install -r requirements.txt`.
-3. Run `python preprocessing.py` to preprocessing dataset. If you want to change your config path:
+3. Run `python preprocessing.py` to preprocess dataset. If you want to change your config path:
 ```
 python preprocessing.py --config <config path>
 ```
