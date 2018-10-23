@@ -1,23 +1,26 @@
 # Bone Suppression from Chest Radiographs
 
 The project is a tool to build **Bone Suppression** model, written in tensorflow
-<img src="images/image.png" alt="CAM example image"/>
+
+<img src="description.png" alt="CAM example image"/>
 
 ## What is [Bone Suppression](https://www.researchgate.net/publication/320252756_Deep_learning_models_for_bone_suppression_in_chest_radiographs?enrichId=rgreq-7b19be48d9763ea61b22252eaf96edca-XXX&enrichSource=Y292ZXJQYWdlOzMyMDI1Mjc1NjtBUzo1ODQ1MzY0NDY0ODAzODRAMTUxNjM3NTc1NzU5Nw%3D%3D&el=1_x_3&_esc=publicationCoverPdf)?
 Bone suppression is an autoencoder-like model for eliminating bone shadow from Chest X-ray images. The model require two types of dataset: normal  and bone-suppression X-ray images. The target model can suppress bone shadow from Chest X-ray images, help Radiologists diagnose better lung related diseases. Although there are some softwares supporting bone suppression ([ClearRead](https://www.riveraintech.com/clearread-xray/), [CareStream](https://www.itnonline.com/content/carestream%E2%80%99s-new-bone-suppression-software-receives-fda-clearance)), this project is a practical open source in computer vision and deep learning.
 
 ## In this project you can
-1. Train/test by following the quickstart. You can get a model with performance close to the paper.
-2. Every time you do a new experiment, make sure you modify `TRAIN`->`output_dir` in `config.ini` otherwise previous training results might be overwritten. For more options check the parameter description in `config.ini`.
-3. Modify `queue_capacity`, `capacity`, `min_after_dequeue`, `num_threads` to be suitable with your training machine.
-4. Enable/disable data preprocessing part, including registration and augmentation.
+1. Preprocessing data, including registration and augmentation.
+2. Train/test by following the quickstart. You can get a model with performance close to the paper.
+3. Visualize your training result with tensorboard
 
 ## Requirements
-The project requires `Python>=3.5` and `Tensorflow>=1.4.1` (both cpu or gpu work well). I have run on a Google Cloud instance, with `1 Tesla K80 (12G)`, `8 vCPUs` and `52 GB memory` and it takes 60 hours for training.
+The project requires `Python>=3.5` and `Tensorflow>=1.11.0` (both cpu or gpu work well). For working expectedly, run the pip command in your global or virtual environment:
+`pip install -r requirements.txt`
+
+I have trained on an instance with `1 NVIDIA GTX 1080Ti (11GB VRAM)` and it takes approximately 14 hours.
 
 ## Configuration
-### DATA
-1. Download all [JSRT dataset](https://gg-l.xyz/17UWm0Co1W) and [BSE-JSRT dataset](https://gg-l.xyz/jWGsWkt). These dataset is preprocessing with jpg format, which can be fed directly to the model. Extract the dataset to `data/jsrt` and `data/bse_jsrt` or you can edit `jsrt_source_dir` and `bse_jsrt_source_dir` in `config.ini`
+### [DATA](config/data_preprocessing.cfg)
+1. You can download the dataset [here](). This dataset includes 3 parts: `JSRT` dataset in `png` format, `BSE_JSRT` dataset in `png` format, and `augmented` dataset which can be trained directly.
 2. To register the dataset, make sure you set `image_registration` to `true`, and the registered images will be saved to x and y sub-directory of `registered_images_dir`. Before feeding to training model, the origin image (like left image in the top) should be inverted, to do that, set `need_invert` to true. The dataset I give you has been already inverted.
 3. To augment the dataset, make sure you set `augment_data` to `true`, the the `registered_images_dir` will be used to load data. The total data after augmentation = `augmentation_seed` x total number of images in `registered_images_dir`. The augmented images will be saved to x and y sub-directory of `augmented_images_dir` with `.jpeg` extension.
 
