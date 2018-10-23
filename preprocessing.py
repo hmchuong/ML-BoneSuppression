@@ -1,95 +1,148 @@
-from utils import extract_data, check_and_create_dir, resize, crop, preprocess
-import os
-from keras.preprocessing.image import ImageDataGenerator
-from scipy.misc import imsave, imresize
+from __future__ import division
+from configparser import ConfigParser
+import argparse
+from utils import extract_image_path, extract_n_preprocess_dicom, check_and_create_dir, extract_image, augment_image_pair
 import imreg_dft as ird
+import os
+import cv2
+from scipy.misc import imsave
+from multiprocessing.pool import Pool
+from itertools import product
 import numpy as np
 
-class ImageProcessing:
-    """ImageProcessing for registration, augmentation images"""
-    def __init__(self, image_size):
-        self.image_size = image_size
+def similarity(params):
+    """
+    Transform target image to make it similar to source image
+    """
+    # The template
+    source_image, target_image, size, source_out_dir, target_out_dir, verbose = params
+    im0 = extract_n_preprocess_dicom(source_image, size)
+    # The image to be transformed
+    im1 = extract_n_preprocess_dicom(target_image, size)
 
-    def registration(self, jsrt_source_dir, need_invert, bse_jsrt_source_dir, output_dir):
-        """
-        Registrating images and save to output_dir
-        """
-        x_images = extract_data([jsrt_source_dir], invert=need_invert)
-        y_images = extract_data([bse_jsrt_source_dir])
+    filename = os.path.basename(os.path.normpath(source_image))
+    if verbose: print("Comparing %r .........." % filename)
+    # Transform im1 to im0
+    result = ird.similarity(im0, im1, numiter=3)
+    source_image_path = os.path.join(source_out_dir, filename)
+    target_image_path = os.path.join(target_out_dir, filename)
+    if verbose: print("Saving %r .........." % source_image_path)
+    imsave(source_image_path, im0)
+    imsave(target_image_path, result['timg'])
+    if verbose: print("Saved %r .........." % source_image_path)
 
-        # Resize images
-        x_images = resize(x_images, self.image_size)
+def get_image_path_from(source_dir, target_dir):
+    """
+    Get image paths from source and target directory
+    """
+    source_images = extract_image_path([source_dir])
+    target_images = extract_image_path([target_dir])
 
-        # Check output directory
-        check_and_create_dir(output_dir)
-        x_dir = os.path.join(output_dir, "x")
-        y_dir = os.path.join(output_dir, "y")
-        check_and_create_dir(x_dir)
-        check_and_create_dir(y_dir)
+    assert len(source_images) == len(target_images), "Number of images in %r is not the same as %r" % (source_dir, target_dir)
+    return (source_images, target_images)
 
-        for i in range(len(x_images)):
-            # the template
-            im0 = x_images[i]
-            # the image to be transformed
-            im1 = imresize(y_images[i], im0.shape, 'lanczos')
-            result = ird.similarity(im0, im1, numiter=3)
-            x_image_path = os.path.join(x_dir,'bs_' + str(i) + '.jpg')
-            y_image_path = os.path.join(y_dir,'bs_' + str(i) + '.jpg')
-            imsave(x_image_path, x_images[i])
-            imsave(y_image_path, result['timg'])
+def check_n_create_output_dir(output_dir):
+    """
+    Check and create output directory
+    """
+    source_out_dir = os.path.join(output_dir, "source")
+    target_out_dir = os.path.join(output_dir, "target")
+    check_and_create_dir(source_out_dir)
+    check_and_create_dir(target_out_dir)
+    return (source_out_dir, target_out_dir)
 
-    def augmentation(self, input_dir, output_dir, seed):
-        """
-        Augmentation data
-        """
-        # Input
-        x_path = os.path.join(input_dir, "x")
-        y_path = os.path.join(input_dir, "y")
-        if (not os.path.exists(x_path)) or (not os.path.exists(y_path)):
-            raise Exception('Sub directory "x" and "y" do not exist in {}'.format(input_dir))
+def registration(verbose, num_threads, size, source_dir, target_dir, output_dir):
+    """
+    Registrating images and save to output_dir
+    """
+    if verbose: print("Get image paths ...")
+    # Get images paths
+    source_images, target_images = get_image_path_from(source_dir, target_dir)
 
-        x_images = extract_data([x_path])
-        y_images = extract_data([y_path])
+    # Check and create output directory
+    source_out_dir, target_out_dir = check_n_create_output_dir(output_dir)
 
-        # Output
-        x_path = os.path.join(output_dir, "x")
-        y_path = os.path.join(output_dir, "y")
-        check_and_create_dir(x_path)
-        check_and_create_dir(y_path)
+    pool = None
+    if num_threads >= 1:
+        pool = Pool(num_threads)
+    else:
+        pool = Pool()
+    job_args = [(source_images[i], target_images[i], size, source_out_dir, target_out_dir, verbose) for i in range(len(source_images))]
+    pool.map(similarity, job_args)
+    pool.close()
+    pool.join()
 
-        train = crop(x_images, upsampling='True')
-        train = resize(train, self.image_size)
-        train = preprocess(train)
-        trainX = np.reshape(train, (len(train), self.image_size, self.image_size, 1))
+def augmentation_pair(params):
+    """
+    Augmenting pair of images
+    """
+    source_image_path, target_image_path, size, source_out_path, target_out_path, verbose = params
+    source_image = extract_image(source_image_path)
+    target_image = extract_image(target_image_path)
+    filename = os.path.basename(os.path.normpath(source_image_path))
+    if verbose:
+        print("Augmenting image %r ..." % filename)
+    augment_image_pair(source_image, target_image, size, source_out_path, target_out_path)
+    if verbose:
+        print("Augmented image %r ..." % filename)
 
-        groundtruth = crop(y_images, upsampling='True')
-        groundtruth = resize(groundtruth, self.image_size)
-        groundtruth = preprocess(groundtruth)
-        trainY = np.reshape(groundtruth, (len(groundtruth), self.image_size, self.image_size, 1))
+def augmentation(verbose, num_threads, source_dir, target_dir, augmentation_seed, size, output_dir):
+    """
+    Augment registered images and save to output_dir
+    """
+    # Get images paths
+    if verbose: print("Get image paths ...")
+    source_images, target_images = get_image_path_from(source_dir, target_dir)
 
-        data_gen_args = dict(
-                    featurewise_center=False,
-                    samplewise_center=False,
-                    featurewise_std_normalization=False,
-                    samplewise_std_normalization=False,
-                    zca_whitening=False,
-                    rotation_range=5.,
-                    width_shift_range=0.08,
-                    height_shift_range=0.08,
-                    shear_range=0.06,
-                    zoom_range=0.08,
-                    channel_shift_range=0.2,
-                    fill_mode='constant',
-                    cval=0.,
-                    horizontal_flip=True,
-                    vertical_flip=False,
-                    rescale=None)
-        image_datagen = ImageDataGenerator(**data_gen_args)
-        image_datagen.fit(trainX, augment=True, seed=1)
-        batch_size = len(trainX)
-        for i in range(seed):
-            print("Generate seed: {}/{}".format(i+1,seed))
-            x = image_datagen.flow(trainX, shuffle=True, seed=i, save_format='jpeg', save_to_dir=x_path, batch_size=batch_size)
-            y = image_datagen.flow(trainY, shuffle=True, seed=i, save_format='jpeg', save_to_dir=y_path, batch_size=batch_size)
-            _ = x.next()
-            _ = y.next()
+    # Check and create output directory
+    source_out_dir, target_out_dir = check_n_create_output_dir(output_dir)
+
+    # Augmenting images
+    pool = None
+    if num_threads >= 1:
+        pool = Pool(num_threads)
+    else:
+        pool = Pool()
+    job_args = []
+    for seed in range(augmentation_seed):
+        for i in range(len(source_images)):
+            image_name = '%r_%r.png' % (seed, i)
+            source_out_path = os.path.join(source_out_dir, image_name)
+            target_out_path = os.path.join(target_out_dir, image_name)
+            job_args.append((source_images[i], target_images[i], size, source_out_path, target_out_path, verbose))
+    pool.map(augmentation_pair, job_args)
+    pool.close()
+    pool.join()
+
+def main(args):
+    cp = ConfigParser()
+    cp.read(args.config)
+
+    verbose = cp["DATA"].getboolean("verbose")
+    num_threads = cp["DATA"].getint("num_threads")
+    image_size = cp["DATA"].getint("image_size")
+
+    # Data registration
+    source_dir = cp["REGISTRATION"].get("source_dir")
+    target_dir = cp["REGISTRATION"].get("target_dir")
+    output_dir = cp["REGISTRATION"].get("registered_output_dir")
+    is_registration = cp["REGISTRATION"].getboolean("data_registration")
+    if is_registration:
+        if verbose: print("Starting registration data ...")
+        registration(verbose, num_threads, image_size, source_dir, target_dir, output_dir)
+
+    # Data augmentation
+    source_dir = cp["AUGMENTATION"].get("source_dir")
+    target_dir = cp["AUGMENTATION"].get("target_dir")
+    output_dir = cp["AUGMENTATION"].get("augmented_output_dir")
+    augmentation_seed = cp["AUGMENTATION"].getint("augmentation_seed")
+    is_augmentation = cp["AUGMENTATION"].getboolean("data_augmentation")
+    if is_augmentation:
+        if verbose: print("Starting augmentation data ...")
+        augmentation(verbose, num_threads, source_dir, target_dir, augmentation_seed, image_size, output_dir)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='hmchuong - BoneSuppression v2 - Preprocessing data')
+    parser.add_argument('--config', default='config/data_preprocessing.cfg', type=str, help='config file')
+    args = parser.parse_args()
+    main(args)

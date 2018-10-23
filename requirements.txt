@@ -1,8 +1,9 @@
-skimage==0.13.1
-scipy==1.0.0
-sklearn==0.19.1
-PIL==5.0.0
-cv2==3.4.0
-numpy==1.14.2
-imreg_dft==2.0.0
-tensorflow==1.7.0
+imreg-dft==2.0.0
+numpy==1.15.2
+opencv-python==3.4.3.18
+Pillow==5.1.0
+scikit-learn==0.20.0
+scipy==1.1.0
+six==1.11.0
+tensorboard==1.11.0
+tensorflow-gpu==1.11.0

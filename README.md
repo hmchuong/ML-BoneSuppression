@@ -13,37 +13,41 @@ Bone suppression is an autoencoder-like model for eliminating bone shadow from C
 3. Visualize your training result with tensorboard
 
 ## Requirements
-The project requires `Python>=3.5` and `Tensorflow>=1.11.0` (both cpu or gpu work well). For working expectedly, run the pip command in your global or virtual environment:
-`pip install -r requirements.txt`
+The project requires `Python>=3.5`.
 
 I have trained on an instance with `1 NVIDIA GTX 1080Ti (11GB VRAM)` and it takes approximately 14 hours.
 
 ## Configuration
 ### [DATA](config/data_preprocessing.cfg)
-1. You can download the dataset [here](). This dataset includes 3 parts: `JSRT` dataset in `png` format, `BSE_JSRT` dataset in `png` format, and `augmented` dataset which can be trained directly.
-2. To register the dataset, make sure you set `image_registration` to `true`, and the registered images will be saved to x and y sub-directory of `registered_images_dir`. Before feeding to training model, the origin image (like left image in the top) should be inverted, to do that, set `need_invert` to true. The dataset I give you has been already inverted.
-3. To augment the dataset, make sure you set `augment_data` to `true`, the the `registered_images_dir` will be used to load data. The total data after augmentation = `augmentation_seed` x total number of images in `registered_images_dir`. The augmented images will be saved to x and y sub-directory of `augmented_images_dir` with `.jpeg` extension.
+1. You can download the dataset [here](https://www.kaggle.com/hmchuong/xray-bone-shadow-supression). This dataset includes 3 parts: `JSRT` dataset in `png` format, `BSE_JSRT` dataset in `png` format, and `augmented` dataset which can be trained directly.
+2. To register the dataset, make sure you set `data_registration` to `true`, and the input images are read from `source_dir` (JSRT) and `target_dir` (BSE_JSRT). The registered images will be saved to `registered_output_dir` into `source` and `target` subdirectories.
+3. To augment the dataset, make sure you set `data_augmentation` to `true`, the `source_dir` and `target_dir` will be used to augment. `The total data after augmentation for source/target` = `augmentation_seed` X total number of images in `source_dir` or `target_dir`. The augmented images will be saved to `source` and `target` subdirectories of `augmented_output_dir` with `.png` extension.
 
-### TRAIN
-1. `x_pattern` and `y_pattern` are file patterns to load training images.
-2. `queue_capacity`, `capacity`, `min_after_dequeue` and `num_threads` are used for input pipeline, the larger number is set, the larger memory will be used. Current values work well on my machine.
-3. Make sure you copy some image pairs (10 is recommended) from `registered_images_dir` to `x_test_dir` and `y_test_dir` for calculating the loss value during training.
+### [TRAIN](config/train.cfg)
+1. `source_folder` and `target_folder` are folders to load training images.
 4. If you want to continue training from your last model, set `use_trained_model` to true and `trained_model` to your model path.
-5. `output_dir` is where you save your model during training
+5. `output_model` is where you save your model during training and `output_log` is where you save the tensorboard checkpoints.
 6. The other parameters is set following the published paper
 
-### TEST
-1. `model` is trained model to load
-2. `input_dir` is where you put all images to encode
-3. `need_invert` is true if all images in `input_dir` need to be inverted before encoding
-4. `output_dir` is where to save all encoded images. These images will have `encoded_` as prefix
+## Pretrained model
+If you want to start testing without training from scratch, you can use the [model](/model) I have trained. The model has loss value: 0.01409, MSE: 7.1687e-4, MS-SSIM: 0.01517
 
 ## Quickstart
 **Note that currently this project can only be executed in Linux and macOS. You might run into some issues in Windows.**
-1. Create & source a new virtualenv.
-2. Install dependencies by running `pip3 install -r requirements.txt`.
-3. Run `python train.py` to train a new model.
-4. Run `python test.py` to evaluate your model on the test set.
+1. Create & activate a new python3 virtualenv. (optional)
+2. Install dependencies by running `pip install -r requirements.txt`.
+3. Run `python train.py` to train a new model. If you want to change your config path:
+```
+python train.py --config <config path>
+```
+During training, you can use Tensorboard to visualize the results:
+```
+tensorboard --logdir=<output_log in train.cfg>
+```
+4. Run `python test.py` to evaluate your model on specific image. To change default parameters, you can use:
+```
+python test.py --model <model_path> --config <model config path> --input <image path> --output <output image path>
+```
 
 ## Acknowledgement
 I would like to thank [LoudeNOUGH](https://github.com/LoudeNOUGH/bone-suppression) for scratch training script and Hussam Habbreeh (حسام هب الريح) for sharing his experiences on this task.
