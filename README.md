@@ -36,7 +36,11 @@ If you want to start testing without training from scratch, you can use the [mod
 **Note that currently this project can only be executed in Linux and macOS. You might run into some issues in Windows.**
 1. Create & activate a new python3 virtualenv. (optional)
 2. Install dependencies by running `pip install -r requirements.txt`.
-3. Run `python train.py` to train a new model. If you want to change your config path:
+3. Run `python preprocessing.py` to preprocessing dataset. If you want to change your config path:
+```
+python preprocessing.py --config <config path>
+```
+4. Run `python train.py` to train a new model. If you want to change your config path:
 ```
 python train.py --config <config path>
 ```
@@ -44,7 +48,7 @@ During training, you can use Tensorboard to visualize the results:
 ```
 tensorboard --logdir=<output_log in train.cfg>
 ```
-4. Run `python test.py` to evaluate your model on specific image. To change default parameters, you can use:
+5. Run `python test.py` to evaluate your model on specific image. To change default parameters, you can use:
 ```
 python test.py --model <model_path> --config <model config path> --input <image path> --output <output image path>
 ```
