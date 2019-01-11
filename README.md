@@ -27,7 +27,7 @@ I have trained on an instance with `1 NVIDIA GTX 1080Ti (11GB VRAM)` and it take
 1. `source_folder` and `target_folder` are folders to load training images.
 4. If you want to continue training from your last model, set `use_trained_model` to true and `trained_model` to your model path.
 5. `output_model` is where you save your model during training and `output_log` is where you save the tensorboard checkpoints.
-6. The other parameters is set following the published paper
+6. The other parameters is set following the published [paper](https://www.researchgate.net/publication/320252756_Deep_learning_models_for_bone_suppression_in_chest_radiographs?enrichId=rgreq-7b19be48d9763ea61b22252eaf96edca-XXX&enrichSource=Y292ZXJQYWdlOzMyMDI1Mjc1NjtBUzo1ODQ1MzY0NDY0ODAzODRAMTUxNjM3NTc1NzU5Nw%3D%3D&el=1_x_3&_esc=publicationCoverPdf)
 
 ## Pretrained model
 If you want to start testing without training from scratch, you can use the [model](/model) I have trained. The model has loss value: 0.01409, MSE: 7.1687e-4, MS-SSIM: 0.01517
